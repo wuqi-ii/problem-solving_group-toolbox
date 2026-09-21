@@ -1,0 +1,24 @@
+# Codex/Word generation and rendering intermediates
+_doc_work/
+需求分析_word/_analysis_work/
+
+# Third-party reference submissions are kept locally only
+需求分析_word/往届同学需求分析例子2023/
+
+# Local development configuration and runtime data
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.yaml
+storage/
+uploads/
+*.log
+
+# IDE and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
