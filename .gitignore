@@ -15,10 +15,24 @@ storage/
 uploads/
 *.log
 
+# Java / Maven
+backend/target/
+*.class
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Test reports and coverage
+coverage/
+test-results/
+
 # IDE and operating-system files
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
 desktop.ini
-
+~$*.doc
+~$*.docx
