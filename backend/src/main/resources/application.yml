@@ -23,6 +23,10 @@ spring:
     console:
       enabled: true
       path: /h2-console
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 52MB
 
 server:
   port: 8080
@@ -41,6 +45,7 @@ app:
     token-validity: PT8H
   storage:
     location: ${STORAGE_LOCATION:../storage}
+    allowed-extensions: pdf,doc,docx,xls,xlsx,ppt,pptx,txt,md,csv,png,jpg,jpeg,gif,webp,zip,rar,7z
 
 logging:
   level:

@@ -8,13 +8,19 @@ import {
   Monitor,
   Promotion,
 } from '@element-plus/icons-vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { logout } from '@/api/auth'
+import { unreadCount } from '@/api/notifications'
 import { useSessionStore } from '@/stores/session'
 
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
+const unread = ref(0)
+async function refreshUnread() { try { unread.value = await unreadCount() } catch { /* 页面仍可正常使用 */ } }
+onMounted(() => { refreshUnread(); window.addEventListener('notifications-changed', refreshUnread) })
+onBeforeUnmount(() => window.removeEventListener('notifications-changed', refreshUnread))
 
 async function signOut() {
   try { await logout() } catch { /* 本地令牌仍需清除 */ }
@@ -54,11 +60,11 @@ async function signOut() {
           <el-icon><Monitor /></el-icon><span>我的设备</span>
         </el-menu-item>
         <el-menu-item index="/notifications">
-          <el-icon><Bell /></el-icon><span>通知中心</span>
+          <el-icon><Bell /></el-icon><span>通知中心 <el-badge v-if="unread" :value="unread" :max="99" /></span>
         </el-menu-item>
       </el-menu>
 
-      <div class="sidebar-foot">第一版 · 工程骨架</div>
+      <div class="sidebar-foot">第一版 · 可演示 MVP</div>
     </el-aside>
 
     <el-container>
