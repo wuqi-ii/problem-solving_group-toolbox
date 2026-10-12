@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 
 import { login, register } from '@/api/auth'
+import { apiErrorMessage } from '@/api/errors'
 import { useSessionStore } from '@/stores/session'
 
 const route = useRoute()
@@ -26,8 +27,8 @@ async function submit() {
     session.setAuth(auth.accessToken, auth.user)
     ElMessage.success(mode.value === 'login' ? '登录成功' : '注册成功')
     await router.replace(String(route.query.redirect ?? '/'))
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.message ?? '暂时无法完成操作')
+  } catch (error: unknown) {
+    ElMessage.error(apiErrorMessage(error, '暂时无法完成操作'))
   } finally {
     submitting.value = false
   }

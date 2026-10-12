@@ -13,6 +13,7 @@ import java.util.Optional;
 public interface TemporaryTransferRepository extends JpaRepository<TemporaryTransferEntity, String> {
     List<TemporaryTransferEntity> findAllByOwnerIdOrderByCreatedAtDesc(String ownerId);
     List<TemporaryTransferEntity> findAllByStatusAndExpiresAtBefore(String status, Instant expiresAt);
+    List<TemporaryTransferEntity> findAllByStatus(String status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select t from TemporaryTransferEntity t where t.pickupCodeHash = :hash")

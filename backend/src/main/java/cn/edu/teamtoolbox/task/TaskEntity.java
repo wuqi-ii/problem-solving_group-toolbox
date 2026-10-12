@@ -58,4 +58,10 @@ public class TaskEntity extends AuditableEntity {
     public String getCreatedBy() { return createdBy; }
     public Instant getDueAt() { return dueAt; }
     public void setStatus(TaskStatus status) { this.status = status; }
+    public void update(String title, String description, TaskPriority priority, Instant dueAt) {
+        this.title = title;
+        this.description = description;
+        this.priority = priority;
+        this.dueAt = dueAt;
+    }
 }

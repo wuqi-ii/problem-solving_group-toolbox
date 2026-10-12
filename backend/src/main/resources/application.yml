@@ -40,12 +40,23 @@ management:
         include: health,info
 
 app:
+  public-base-url: ${PUBLIC_BASE_URL:http://localhost:5173}
+  task:
+    reminder-interval-ms: 900000
+  transfer:
+    pickup-rate-limit-per-minute: ${PICKUP_RATE_LIMIT:60}
   security:
     jwt-secret: ${JWT_SECRET:team-toolbox-local-development-secret-change-me}
     token-validity: PT8H
+    auth-rate-limit-per-minute: ${AUTH_RATE_LIMIT:30}
   storage:
     location: ${STORAGE_LOCATION:../storage}
+    max-group-bytes: ${MAX_GROUP_BYTES:524288000}
     allowed-extensions: pdf,doc,docx,xls,xlsx,ppt,pptx,txt,md,csv,png,jpg,jpeg,gif,webp,zip,rar,7z
+  ai:
+    enabled: false
+    provider: deepseek
+    # DeepSeek credentials are intentionally not configured until the final AI phase.
 
 logging:
   level:

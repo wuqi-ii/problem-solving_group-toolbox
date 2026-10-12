@@ -13,6 +13,9 @@ export async function createDeviceFile(file: File, sourceDevice: string) {
   return (await http.post<ApiResponse<DeviceItemView>>('/device-items/files', form, { params: { sourceDevice } })).data.data
 }
 export async function deleteDeviceItem(id: string) { await http.delete(`/device-items/${id}`) }
+export async function importDeviceFileToGroup(id: string, groupId: string) {
+  return (await http.post(`/groups/${groupId}/files/import-device/${id}`)).data.data
+}
 export async function downloadDeviceFile(item: DeviceItemView) {
   const response = await http.get<Blob>(`/device-items/${item.id}/download`, { responseType: 'blob' })
   const url = URL.createObjectURL(response.data); const anchor = document.createElement('a')

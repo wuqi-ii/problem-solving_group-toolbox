@@ -27,3 +27,6 @@ export async function downloadPickup(code: string, fileName: string) {
   const url = URL.createObjectURL(response.data); const anchor = document.createElement('a')
   anchor.href = url; anchor.download = fileName; anchor.click(); URL.revokeObjectURL(url)
 }
+export async function savePickupToDevice(code: string) {
+  return (await http.post(`/transfer-imports/${code}/device`, null, { params: { sourceDevice: '临时取件' } })).data.data
+}

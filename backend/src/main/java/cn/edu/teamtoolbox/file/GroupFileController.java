@@ -41,12 +41,51 @@ public class GroupFileController {
         return ApiResponse.ok(fileService.upload(groupId, principal.id(), file));
     }
 
+    @PostMapping("/groups/{groupId}/files/import-device/{deviceItemId}")
+    public ApiResponse<FileView> importDeviceFile(
+            @PathVariable String groupId,
+            @PathVariable String deviceItemId,
+            @AuthenticationPrincipal CurrentUserPrincipal principal
+    ) {
+        return ApiResponse.ok(fileService.importDeviceFile(groupId, deviceItemId, principal.id()));
+    }
+
     @GetMapping("/groups/{groupId}/files")
     public ApiResponse<List<FileView>> list(
             @PathVariable String groupId,
             @AuthenticationPrincipal CurrentUserPrincipal principal
     ) {
         return ApiResponse.ok(fileService.list(groupId, principal.id()));
+    }
+
+    @GetMapping("/groups/{groupId}/files/trash")
+    public ApiResponse<List<FileView>> listTrash(
+            @PathVariable String groupId,
+            @AuthenticationPrincipal CurrentUserPrincipal principal
+    ) {
+        return ApiResponse.ok(fileService.listTrash(groupId, principal.id()));
+    }
+
+    @GetMapping("/groups/{groupId}/files/quota")
+    public ApiResponse<FileQuotaView> quota(
+            @PathVariable String groupId,
+            @AuthenticationPrincipal CurrentUserPrincipal principal
+    ) {
+        return ApiResponse.ok(fileService.quota(groupId, principal.id()));
+    }
+
+    @GetMapping(value = "/groups/{groupId}/task-results/archive", produces = "application/zip")
+    public ResponseEntity<byte[]> downloadTaskResults(
+            @PathVariable String groupId,
+            @AuthenticationPrincipal CurrentUserPrincipal principal
+    ) {
+        TaskResultArchive archive = fileService.downloadTaskResults(groupId, principal.id());
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/zip"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename("task-results.zip", StandardCharsets.UTF_8).build().toString())
+                .header("X-Archive-File-Count", Integer.toString(archive.fileCount()))
+                .body(archive.content());
     }
 
     @GetMapping("/files/{fileId}/download")
@@ -64,6 +103,27 @@ public class GroupFileController {
                 .body(download.resource());
     }
 
+    @GetMapping("/files/{fileId}/preview")
+    public ResponseEntity<Resource> preview(
+            @PathVariable String fileId,
+            @AuthenticationPrincipal CurrentUserPrincipal principal
+    ) {
+        FileDownload preview = fileService.preview(fileId, principal.id());
+        MediaType contentType;
+        try {
+            contentType = preview.metadata().getContentType() == null
+                    ? MediaType.APPLICATION_OCTET_STREAM
+                    : MediaType.parseMediaType(preview.metadata().getContentType());
+        } catch (IllegalArgumentException exception) {
+            contentType = MediaType.APPLICATION_OCTET_STREAM;
+        }
+        return ResponseEntity.ok().contentType(contentType)
+                .contentLength(preview.metadata().getSizeBytes())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(preview.metadata().getDisplayName(), StandardCharsets.UTF_8).build().toString())
+                .body(preview.resource());
+    }
+
     @PatchMapping("/files/{fileId}")
     public ApiResponse<FileView> rename(
             @PathVariable String fileId,
@@ -73,12 +133,38 @@ public class GroupFileController {
         return ApiResponse.ok(fileService.rename(fileId, principal.id(), request));
     }
 
+    @PatchMapping("/files/{fileId}/category")
+    public ApiResponse<FileView> updateCategory(
+            @PathVariable String fileId,
+            @AuthenticationPrincipal CurrentUserPrincipal principal,
+            @Valid @RequestBody UpdateFileCategoryRequest request
+    ) {
+        return ApiResponse.ok(fileService.updateCategory(fileId, principal.id(), request));
+    }
+
     @DeleteMapping("/files/{fileId}")
     public ApiResponse<Void> delete(
             @PathVariable String fileId,
             @AuthenticationPrincipal CurrentUserPrincipal principal
     ) {
         fileService.delete(fileId, principal.id());
+        return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/files/{fileId}/restore")
+    public ApiResponse<FileView> restore(
+            @PathVariable String fileId,
+            @AuthenticationPrincipal CurrentUserPrincipal principal
+    ) {
+        return ApiResponse.ok(fileService.restore(fileId, principal.id()));
+    }
+
+    @DeleteMapping("/files/{fileId}/purge")
+    public ApiResponse<Void> purge(
+            @PathVariable String fileId,
+            @AuthenticationPrincipal CurrentUserPrincipal principal
+    ) {
+        fileService.purge(fileId, principal.id());
         return ApiResponse.ok(null);
     }
 }

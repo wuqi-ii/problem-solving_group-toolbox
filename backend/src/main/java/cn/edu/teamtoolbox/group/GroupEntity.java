@@ -43,4 +43,5 @@ public class GroupEntity extends AuditableEntity {
     public String getDescription() { return description; }
     public String getLeaderId() { return leaderId; }
     public String getStatus() { return status; }
+    public void transferLeadership(String newLeaderId) { this.leaderId = newLeaderId; }
 }

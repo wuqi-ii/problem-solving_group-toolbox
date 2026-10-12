@@ -13,6 +13,10 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import cn.edu.teamtoolbox.audit.AuditMutationFilter;
+import cn.edu.teamtoolbox.audit.AuditService;
+import cn.edu.teamtoolbox.transfer.PickupRateLimitFilter;
+import org.springframework.beans.factory.annotation.Value;
 
 @Configuration
 public class SecurityConfig {
@@ -21,7 +25,10 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             ObjectMapper objectMapper,
-            JwtAuthenticationFilter jwtAuthenticationFilter
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            AuditService auditService,
+            @Value("${app.transfer.pickup-rate-limit-per-minute:60}") int pickupLimit,
+            @Value("${app.security.auth-rate-limit-per-minute:30}") int authLimit
     ) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
@@ -52,6 +59,9 @@ public class SecurityConfig {
                                     ApiResponse.error("FORBIDDEN", "没有执行该操作的权限"));
                         }))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new PickupRateLimitFilter(objectMapper, pickupLimit), JwtAuthenticationFilter.class)
+                .addFilterBefore(new AuthRateLimitFilter(objectMapper, authLimit), PickupRateLimitFilter.class)
+                .addFilterAfter(new AuditMutationFilter(auditService), JwtAuthenticationFilter.class)
                 .build();
     }
 

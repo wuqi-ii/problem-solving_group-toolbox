@@ -7,6 +7,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import java.util.UUID;
+import java.time.Instant;
 
 @Entity
 @Table(name = "group_file")
@@ -30,12 +31,18 @@ public class GroupFileEntity extends AuditableEntity {
     private String uploadedBy;
     @Column(nullable = false, length = 20)
     private String status;
+    @Column(nullable = false, length = 30)
+    private String category;
+    @Column(name = "version_no", nullable = false)
+    private int versionNo;
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 
     protected GroupFileEntity() {
     }
 
     public GroupFileEntity(String groupId, String originalName, String storageKey,
-                           String contentType, long sizeBytes, String uploadedBy) {
+                           String contentType, long sizeBytes, String uploadedBy, int versionNo) {
         this.id = UUID.randomUUID().toString();
         this.groupId = groupId;
         this.originalName = originalName;
@@ -45,6 +52,8 @@ public class GroupFileEntity extends AuditableEntity {
         this.sizeBytes = sizeBytes;
         this.uploadedBy = uploadedBy;
         this.status = "ACTIVE";
+        this.category = "GENERAL";
+        this.versionNo = versionNo;
     }
 
     public String getId() { return id; }
@@ -56,6 +65,11 @@ public class GroupFileEntity extends AuditableEntity {
     public long getSizeBytes() { return sizeBytes; }
     public String getUploadedBy() { return uploadedBy; }
     public String getStatus() { return status; }
+    public String getCategory() { return category; }
+    public int getVersionNo() { return versionNo; }
+    public Instant getDeletedAt() { return deletedAt; }
     public void rename(String displayName) { this.displayName = displayName; }
-    public void softDelete() { this.status = "DELETED"; }
+    public void setCategory(String category) { this.category = category; }
+    public void softDelete() { this.status = "DELETED"; this.deletedAt = Instant.now(); }
+    public void restore() { this.status = "ACTIVE"; this.deletedAt = null; }
 }

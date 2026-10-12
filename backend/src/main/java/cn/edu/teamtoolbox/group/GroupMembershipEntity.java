@@ -57,4 +57,13 @@ public class GroupMembershipEntity {
     public String getRole() { return role; }
     public String getStatus() { return status; }
     public Instant getJoinedAt() { return joinedAt; }
+    public void promoteToLeader() { this.role = "LEADER"; }
+    public void demoteToMember() { this.role = "MEMBER"; }
+    public void leave() { this.status = "LEFT"; }
+    public void remove() { this.status = "REMOVED"; }
+    public void reactivate() {
+        this.role = "MEMBER";
+        this.status = "ACTIVE";
+        this.joinedAt = Instant.now();
+    }
 }

@@ -3,6 +3,9 @@ package cn.edu.teamtoolbox.transfer;
 import cn.edu.teamtoolbox.common.error.BusinessException;
 import cn.edu.teamtoolbox.common.error.ErrorCode;
 import cn.edu.teamtoolbox.file.FileStorageService;
+import cn.edu.teamtoolbox.device.DeviceItemEntity;
+import cn.edu.teamtoolbox.device.DeviceItemRepository;
+import cn.edu.teamtoolbox.device.DeviceItemView;
 import org.springframework.core.io.Resource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -25,11 +28,17 @@ public class TemporaryTransferService {
     private static final char[] CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
     private final TemporaryTransferRepository repository;
     private final FileStorageService storageService;
+    private final DeviceItemRepository deviceItemRepository;
     private final SecureRandom random = new SecureRandom();
 
-    public TemporaryTransferService(TemporaryTransferRepository repository, FileStorageService storageService) {
+    public TemporaryTransferService(
+            TemporaryTransferRepository repository,
+            FileStorageService storageService,
+            DeviceItemRepository deviceItemRepository
+    ) {
         this.repository = repository;
         this.storageService = storageService;
+        this.deviceItemRepository = deviceItemRepository;
     }
 
     @Transactional
@@ -91,11 +100,40 @@ public class TemporaryTransferService {
         return new TransferDownload(entity.getOriginalName(), entity.getSizeBytes(), resource);
     }
 
+    @Transactional
+    public DeviceItemView saveToDevice(String code, String ownerId, String sourceDevice) {
+        TemporaryTransferEntity transfer = repository.findByCodeForUpdate(hash(normalizeCode(code)))
+                .orElseThrow(() -> unavailable());
+        requireAvailable(transfer);
+        Resource source = storageService.load(transfer.getStorageKey());
+        if (!source.exists() || !source.isReadable()) throw unavailable();
+        String copiedStorageKey = null;
+        try {
+            copiedStorageKey = storageService.store("device-" + ownerId, source.getInputStream());
+            DeviceItemEntity item = deviceItemRepository.save(DeviceItemEntity.file(
+                    ownerId, transfer.getOriginalName(), copiedStorageKey, transfer.getContentType(),
+                    transfer.getSizeBytes(), normalizeDevice(sourceDevice)));
+            transfer.recordDownload();
+            return new DeviceItemView(item.getId(), item.getType(), item.getTextContent(), item.getFileName(),
+                    item.getSizeBytes(), item.getSourceDevice(), item.getCreatedAt());
+        } catch (IOException exception) {
+            cleanup(copiedStorageKey);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "保存到设备空间失败");
+        } catch (RuntimeException exception) {
+            cleanup(copiedStorageKey);
+            throw exception;
+        }
+    }
+
     @Scheduled(fixedDelayString = "${app.transfer.cleanup-interval-ms:3600000}")
     @Transactional
     public void cleanExpired() {
         repository.findAllByStatusAndExpiresAtBefore("ACTIVE", Instant.now()).forEach(entity -> {
             entity.expire();
+            cleanup(entity.getStorageKey());
+            entity.cleaned();
+        });
+        repository.findAllByStatus("EXHAUSTED").forEach(entity -> {
             cleanup(entity.getStorageKey());
             entity.cleaned();
         });
@@ -141,6 +179,10 @@ public class TemporaryTransferService {
     private String normalizeCode(String code) {
         if (code == null || code.isBlank()) throw unavailable();
         return code.trim().toUpperCase();
+    }
+
+    private String normalizeDevice(String sourceDevice) {
+        return sourceDevice == null || sourceDevice.isBlank() ? "临时取件" : sourceDevice.trim();
     }
 
     private String safeName(String value) {

@@ -26,7 +26,7 @@ class UtilityModuleFlowTests {
                 "file", "handoff.txt", MediaType.TEXT_PLAIN_VALUE, "cross-device payload".getBytes());
 
         String body = mockMvc.perform(multipart("/api/v1/transfers")
-                        .file(file).param("validHours", "2").param("maxDownloads", "1")
+                        .file(file).param("validHours", "2").param("maxDownloads", "2")
                         .header("Authorization", authorization))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.pickupCode").isNotEmpty())
@@ -36,6 +36,24 @@ class UtilityModuleFlowTests {
         mockMvc.perform(get("/api/v1/pickup/{code}", code))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.fileName").value("handoff.txt"))
+                .andExpect(jsonPath("$.data.remainingDownloads").value(2));
+        mockMvc.perform(get("/api/v1/pickup/{code}/qr", code))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.IMAGE_PNG))
+                .andExpect(header().exists("Content-Type"));
+        mockMvc.perform(post("/api/v1/transfer-imports/{code}/device", code)
+                        .header("Authorization", authorization)
+                        .param("sourceDevice", "临时取件"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.fileName").value("handoff.txt"));
+        mockMvc.perform(get("/api/v1/device-items").header("Authorization", authorization))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].fileName").value("handoff.txt"));
+        mockMvc.perform(get("/api/v1/audit-logs").header("Authorization", authorization))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(org.hamcrest.Matchers.greaterThan(0)));
+        mockMvc.perform(get("/api/v1/pickup/{code}", code))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.remainingDownloads").value(1));
         mockMvc.perform(get("/api/v1/pickup/{code}/download", code))
                 .andExpect(status().isOk())

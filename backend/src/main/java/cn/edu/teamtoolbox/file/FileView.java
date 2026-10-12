@@ -11,6 +11,11 @@ public record FileView(
         String uploadedBy,
         String uploaderName,
         Instant createdAt,
+        String category,
+        int versionNo,
+        String status,
+        Instant deletedAt,
+        boolean previewable,
         boolean canManage
 ) {
 }

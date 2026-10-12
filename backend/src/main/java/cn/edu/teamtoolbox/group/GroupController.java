@@ -55,6 +55,24 @@ public class GroupController {
         return ApiResponse.ok(groupService.createInvitation(groupId, principal.id(), request));
     }
 
+    @GetMapping("/{groupId}/invitations")
+    public ApiResponse<List<InvitationView>> listInvitations(
+            @PathVariable String groupId,
+            @AuthenticationPrincipal CurrentUserPrincipal principal
+    ) {
+        return ApiResponse.ok(groupService.listInvitations(groupId, principal.id()));
+    }
+
+    @DeleteMapping("/{groupId}/invitations/{invitationId}")
+    public ApiResponse<Void> cancelInvitation(
+            @PathVariable String groupId,
+            @PathVariable String invitationId,
+            @AuthenticationPrincipal CurrentUserPrincipal principal
+    ) {
+        groupService.cancelInvitation(groupId, invitationId, principal.id());
+        return ApiResponse.ok(null);
+    }
+
     @PostMapping("/join")
     public ApiResponse<GroupView> join(
             @AuthenticationPrincipal CurrentUserPrincipal principal,
@@ -83,5 +101,33 @@ public class GroupController {
     ) {
         groupService.revokePermission(groupId, userId, permission, principal.id());
         return ApiResponse.ok(null);
+    }
+
+    @DeleteMapping("/{groupId}/members/{userId}")
+    public ApiResponse<Void> removeMember(
+            @PathVariable String groupId,
+            @PathVariable String userId,
+            @AuthenticationPrincipal CurrentUserPrincipal principal
+    ) {
+        groupService.removeMember(groupId, userId, principal.id());
+        return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/{groupId}/leave")
+    public ApiResponse<Void> leaveGroup(
+            @PathVariable String groupId,
+            @AuthenticationPrincipal CurrentUserPrincipal principal
+    ) {
+        groupService.leaveGroup(groupId, principal.id());
+        return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/{groupId}/leader/{userId}")
+    public ApiResponse<GroupView> transferLeadership(
+            @PathVariable String groupId,
+            @PathVariable String userId,
+            @AuthenticationPrincipal CurrentUserPrincipal principal
+    ) {
+        return ApiResponse.ok(groupService.transferLeadership(groupId, userId, principal.id()));
     }
 }

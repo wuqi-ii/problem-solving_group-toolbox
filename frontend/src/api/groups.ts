@@ -6,6 +6,7 @@ export interface GroupView {
   description: string | null
   leaderId: string
   myRole: 'LEADER' | 'ADMIN' | 'MEMBER'
+  myPermissions: PermissionType[]
 }
 
 export interface MemberView {
@@ -18,6 +19,16 @@ export interface MemberView {
 }
 
 export type PermissionType = 'MEMBER_MANAGE' | 'TASK_CREATE' | 'TASK_REVIEW' | 'FILE_MANAGE' | 'GROUP_ANNOUNCE'
+
+export interface InvitationView {
+  id: string
+  code: string
+  expiresAt: string
+  maxUses: number
+  usedCount: number
+  status: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'CANCELLED'
+  createdAt: string
+}
 
 export async function listGroups() {
   const response = await http.get<ApiResponse<GroupView[]>>('/groups')
@@ -35,9 +46,17 @@ export async function listMembers(groupId: string) {
 }
 
 export async function createInvitation(groupId: string) {
-  const response = await http.post<ApiResponse<{ code: string; expiresAt: string }>>(
+  const response = await http.post<ApiResponse<InvitationView>>(
     `/groups/${groupId}/invitations`, { validHours: 72, maxUses: 20 })
   return response.data.data
+}
+
+export async function listInvitations(groupId: string) {
+  return (await http.get<ApiResponse<InvitationView[]>>(`/groups/${groupId}/invitations`)).data.data
+}
+
+export async function cancelInvitation(groupId: string, invitationId: string) {
+  await http.delete(`/groups/${groupId}/invitations/${invitationId}`)
 }
 
 export async function joinGroup(code: string) {
@@ -51,4 +70,16 @@ export async function grantPermission(groupId: string, userId: string, permissio
 
 export async function revokePermission(groupId: string, userId: string, permission: PermissionType) {
   await http.delete(`/groups/${groupId}/members/${userId}/permissions/${permission}`)
+}
+
+export async function removeMember(groupId: string, userId: string) {
+  await http.delete(`/groups/${groupId}/members/${userId}`)
+}
+
+export async function leaveGroup(groupId: string) {
+  await http.post(`/groups/${groupId}/leave`)
+}
+
+export async function transferLeadership(groupId: string, userId: string) {
+  await http.post(`/groups/${groupId}/leader/${userId}`)
 }

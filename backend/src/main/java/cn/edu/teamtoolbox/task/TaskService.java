@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.UUID;
 
 @Service
 public class TaskService {
@@ -84,8 +85,63 @@ public class TaskService {
     }
 
     @Transactional
+    public TaskView update(String taskId, String requesterId, UpdateTaskRequest request) {
+        TaskEntity task = requireTask(taskId);
+        authorizationService.requireLeaderOrPermission(task.getGroupId(), requesterId, PermissionType.TASK_CREATE);
+        if (!List.of(TaskStatus.OPEN, TaskStatus.IN_PROGRESS, TaskStatus.NEEDS_CHANGES).contains(task.getStatus())) {
+            throw new BusinessException(ErrorCode.CONFLICT, "当前任务状态不允许修改");
+        }
+        if (request.dueAt() != null && request.dueAt().isBefore(Instant.now())) {
+            throw new BusinessException(ErrorCode.INVALID_ARGUMENT, "截止时间必须晚于当前时间");
+        }
+        List<String> assigneeIds = new LinkedHashSet<>(request.assigneeIds()).stream().toList();
+        validateAssignees(task.getGroupId(), assigneeIds);
+        task.update(request.title().trim(), normalize(request.description()), request.priority(), request.dueAt());
+
+        Map<String, TaskAssignmentEntity> existing = assignmentRepository.findAllByTaskId(taskId).stream()
+                .collect(Collectors.toMap(TaskAssignmentEntity::getUserId, Function.identity()));
+        existing.values().stream().filter(item -> !assigneeIds.contains(item.getUserId()))
+                .forEach(TaskAssignmentEntity::deactivate);
+        assigneeIds.forEach(userId -> {
+            TaskAssignmentEntity assignment = existing.get(userId);
+            if (assignment == null) {
+                assignmentRepository.save(new TaskAssignmentEntity(taskId, userId));
+                notificationService.create(userId, "task-assigned:" + taskId, "TASK_ASSIGNED",
+                        "你有一个新任务", task.getTitle(), "/tasks");
+            } else if (!"ACTIVE".equals(assignment.getStatus())) {
+                assignment.activate();
+            }
+        });
+        String updateEvent = "task-updated:" + taskId + ":" + UUID.randomUUID();
+        existing.values().stream()
+                .filter(item -> assigneeIds.contains(item.getUserId()))
+                .filter(item -> !item.getUserId().equals(requesterId))
+                .forEach(item -> notificationService.create(
+                        item.getUserId(), updateEvent, "TASK_UPDATED",
+                        "任务内容已更新", task.getTitle(), "/tasks"));
+        return toView(task, requesterId);
+    }
+
+    @Transactional
+    public TaskView cancel(String taskId, String requesterId) {
+        TaskEntity task = requireTask(taskId);
+        authorizationService.requireLeaderOrPermission(task.getGroupId(), requesterId, PermissionType.TASK_CREATE);
+        if (!List.of(TaskStatus.OPEN, TaskStatus.IN_PROGRESS, TaskStatus.NEEDS_CHANGES).contains(task.getStatus())) {
+            throw new BusinessException(ErrorCode.CONFLICT, "当前任务状态不允许取消");
+        }
+        List<TaskAssignmentEntity> assignments = assignmentRepository.findAllByTaskIdAndStatus(taskId, "ACTIVE");
+        task.setStatus(TaskStatus.CANCELLED);
+        assignments.forEach(assignment -> {
+            notificationService.create(assignment.getUserId(), "task-cancelled:" + taskId,
+                    "TASK_CANCELLED", "任务已取消", task.getTitle(), "/tasks");
+        });
+        return toView(task, requesterId);
+    }
+
+    @Transactional
     public TaskView start(String taskId, String requesterId) {
         TaskEntity task = requireTask(taskId);
+        authorizationService.requireMember(task.getGroupId(), requesterId);
         requireAssignee(taskId, requesterId);
         if (task.getStatus() != TaskStatus.OPEN && task.getStatus() != TaskStatus.NEEDS_CHANGES) {
             throw new BusinessException(ErrorCode.CONFLICT, "当前任务状态无法开始");
@@ -97,6 +153,7 @@ public class TaskService {
     @Transactional
     public TaskView submit(String taskId, String requesterId, SubmitTaskRequest request) {
         TaskEntity task = requireTask(taskId);
+        authorizationService.requireMember(task.getGroupId(), requesterId);
         requireAssignee(taskId, requesterId);
         if (!List.of(TaskStatus.OPEN, TaskStatus.IN_PROGRESS, TaskStatus.NEEDS_CHANGES).contains(task.getStatus())) {
             throw new BusinessException(ErrorCode.CONFLICT, "当前任务状态无法提交");
@@ -129,6 +186,10 @@ public class TaskService {
         }
         reviewRepository.save(new TaskReviewEntity(
                 taskId, submission.getId(), requesterId, request.decision(), normalize(request.comment())));
+        if (request.decision() == ReviewDecision.APPROVED && submission.getAttachmentFileId() != null) {
+            fileRepository.findById(submission.getAttachmentFileId())
+                    .ifPresent(file -> file.setCategory("TASK_RESULT"));
+        }
         task.setStatus(request.decision() == ReviewDecision.APPROVED
                 ? TaskStatus.COMPLETED : TaskStatus.NEEDS_CHANGES);
         String result = request.decision() == ReviewDecision.APPROVED ? "已通过" : "需要修改";
@@ -138,36 +199,53 @@ public class TaskService {
     }
 
     private TaskView toView(TaskEntity task, String requesterId) {
-        List<TaskAssignmentEntity> assignments = assignmentRepository.findAllByTaskIdAndStatus(task.getId(), "ACTIVE");
+        List<TaskAssignmentEntity> allAssignments = assignmentRepository.findAllByTaskId(task.getId());
         Map<String, UserEntity> users = userRepository.findAllById(
-                        assignments.stream().map(TaskAssignmentEntity::getUserId).toList()).stream()
+                        allAssignments.stream().map(TaskAssignmentEntity::getUserId).toList()).stream()
                 .collect(Collectors.toMap(UserEntity::getId, Function.identity()));
-        List<TaskAssigneeView> assignees = assignments.stream()
+        List<TaskAssigneeView> assignees = allAssignments.stream()
+                .filter(item -> "ACTIVE".equals(item.getStatus()))
                 .filter(item -> users.containsKey(item.getUserId()))
                 .map(item -> new TaskAssigneeView(item.getUserId(), users.get(item.getUserId()).getNickname()))
                 .toList();
-        TaskSubmissionView latest = submissionRepository.findTopByTaskIdOrderByVersionNoDesc(task.getId())
-                .map(submission -> {
-                    TaskReviewEntity review = reviewRepository.findBySubmissionId(submission.getId()).orElse(null);
-                    GroupFileEntity attachment = submission.getAttachmentFileId() == null ? null
-                            : fileRepository.findById(submission.getAttachmentFileId()).orElse(null);
-                    return new TaskSubmissionView(
-                            submission.getId(), submission.getVersionNo(), submission.getContent(),
-                            submission.getAttachmentFileId(), attachment == null ? null : attachment.getDisplayName(),
-                            submission.getSubmittedBy(), submission.getSubmittedAt(),
-                            review == null ? null : review.getDecision(),
-                            review == null ? null : review.getComment(),
-                            review == null ? null : review.getReviewedAt());
-                }).orElse(null);
+        List<TaskAssigneeView> historicalAssignees = allAssignments.stream()
+                .filter(item -> !"ACTIVE".equals(item.getStatus()))
+                .filter(item -> users.containsKey(item.getUserId()))
+                .map(item -> new TaskAssigneeView(item.getUserId(), users.get(item.getUserId()).getNickname()))
+                .toList();
+        List<TaskSubmissionView> submissions = submissionRepository
+                .findAllByTaskIdOrderByVersionNoDesc(task.getId()).stream()
+                .map(this::toSubmissionView)
+                .toList();
+        TaskSubmissionView latest = submissions.isEmpty() ? null : submissions.get(0);
         boolean assignee = assignmentRepository.existsByTaskIdAndUserIdAndStatus(task.getId(), requesterId, "ACTIVE");
         boolean canReview = task.getStatus() == TaskStatus.SUBMITTED
                 && authorizationService.isLeaderOrHas(task.getGroupId(), requesterId, PermissionType.TASK_REVIEW);
+        boolean canManage = !List.of(TaskStatus.COMPLETED, TaskStatus.CANCELLED, TaskStatus.SUBMITTED)
+                .contains(task.getStatus())
+                && authorizationService.isLeaderOrHas(task.getGroupId(), requesterId, PermissionType.TASK_CREATE);
+        boolean overdue = task.getDueAt() != null && task.getDueAt().isBefore(Instant.now())
+                && !List.of(TaskStatus.COMPLETED, TaskStatus.CANCELLED).contains(task.getStatus());
         return new TaskView(
                 task.getId(), task.getGroupId(), task.getTitle(), task.getDescription(), task.getPriority(),
-                task.getStatus(), task.getCreatedBy(), task.getDueAt(), assignees, latest,
+                task.getStatus(), task.getCreatedBy(), task.getDueAt(), assignees, historicalAssignees,
+                latest, submissions,
                 assignee && List.of(TaskStatus.OPEN, TaskStatus.NEEDS_CHANGES).contains(task.getStatus()),
                 assignee && List.of(TaskStatus.OPEN, TaskStatus.IN_PROGRESS, TaskStatus.NEEDS_CHANGES).contains(task.getStatus()),
-                canReview);
+                canReview, canManage, overdue);
+    }
+
+    private TaskSubmissionView toSubmissionView(TaskSubmissionEntity submission) {
+        TaskReviewEntity review = reviewRepository.findBySubmissionId(submission.getId()).orElse(null);
+        GroupFileEntity attachment = submission.getAttachmentFileId() == null ? null
+                : fileRepository.findById(submission.getAttachmentFileId()).orElse(null);
+        return new TaskSubmissionView(
+                submission.getId(), submission.getVersionNo(), submission.getContent(),
+                submission.getAttachmentFileId(), attachment == null ? null : attachment.getDisplayName(),
+                submission.getSubmittedBy(), submission.getSubmittedAt(),
+                review == null ? null : review.getDecision(),
+                review == null ? null : review.getComment(),
+                review == null ? null : review.getReviewedAt());
     }
 
     private TaskEntity requireTask(String taskId) {
@@ -179,6 +257,12 @@ public class TaskService {
         if (!assignmentRepository.existsByTaskIdAndUserIdAndStatus(taskId, userId, "ACTIVE")) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "你不是该任务的执行人");
         }
+    }
+
+    private void validateAssignees(String groupId, List<String> assigneeIds) {
+        assigneeIds.forEach(userId -> membershipRepository
+                .findByGroupIdAndUserIdAndStatus(groupId, userId, "ACTIVE")
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_ARGUMENT, "被指派人不是小组成员")));
     }
 
     private String normalize(String value) {

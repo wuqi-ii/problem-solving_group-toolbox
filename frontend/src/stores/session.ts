@@ -16,11 +16,15 @@ function restoreUser(): CurrentUser | null {
   }
 }
 
+function restoreActiveGroupId(): string | null {
+  return localStorage.getItem('team-toolbox-active-group')
+}
+
 export const useSessionStore = defineStore('session', {
   state: () => ({
     token: localStorage.getItem('team-toolbox-token'),
     user: restoreUser(),
-    activeGroupId: null as string | null,
+    activeGroupId: restoreActiveGroupId(),
   }),
   getters: {
     isAuthenticated: (state) => Boolean(state.token && state.user),
@@ -38,9 +42,12 @@ export const useSessionStore = defineStore('session', {
       this.activeGroupId = null
       localStorage.removeItem('team-toolbox-token')
       localStorage.removeItem('team-toolbox-user')
+      localStorage.removeItem('team-toolbox-active-group')
     },
     switchGroup(groupId: string | null) {
       this.activeGroupId = groupId
+      if (groupId) localStorage.setItem('team-toolbox-active-group', groupId)
+      else localStorage.removeItem('team-toolbox-active-group')
     },
   },
 })

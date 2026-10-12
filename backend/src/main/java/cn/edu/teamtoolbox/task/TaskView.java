@@ -13,9 +13,13 @@ public record TaskView(
         String createdBy,
         Instant dueAt,
         List<TaskAssigneeView> assignees,
+        List<TaskAssigneeView> historicalAssignees,
         TaskSubmissionView latestSubmission,
+        List<TaskSubmissionView> submissions,
         boolean canStart,
         boolean canSubmit,
-        boolean canReview
+        boolean canReview,
+        boolean canManage,
+        boolean overdue
 ) {
 }

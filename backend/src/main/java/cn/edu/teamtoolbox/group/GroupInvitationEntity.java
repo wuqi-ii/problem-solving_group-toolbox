@@ -55,14 +55,22 @@ public class GroupInvitationEntity {
     }
 
     public String getGroupId() { return groupId; }
+    public String getId() { return id; }
     public String getCode() { return code; }
+    public String getCreatedBy() { return createdBy; }
     public Instant getExpiresAt() { return expiresAt; }
     public int getMaxUses() { return maxUses; }
     public int getUsedCount() { return usedCount; }
     public String getStatus() { return status; }
+    public Instant getCreatedAt() { return createdAt; }
 
     public void useOnce() {
         usedCount++;
         if (usedCount >= maxUses) status = "EXHAUSTED";
+    }
+
+    public void cancel() { this.status = "CANCELLED"; }
+    public void expireIfNecessary(Instant now) {
+        if ("ACTIVE".equals(status) && expiresAt.isBefore(now)) status = "EXPIRED";
     }
 }

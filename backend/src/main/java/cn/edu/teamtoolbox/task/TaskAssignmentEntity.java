@@ -36,4 +36,7 @@ public class TaskAssignmentEntity {
 
     public String getTaskId() { return taskId; }
     public String getUserId() { return userId; }
+    public String getStatus() { return status; }
+    public void activate() { this.status = "ACTIVE"; this.assignedAt = Instant.now(); }
+    public void deactivate() { this.status = "INACTIVE"; }
 }

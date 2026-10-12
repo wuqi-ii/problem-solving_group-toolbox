@@ -1,0 +1,9 @@
+{
+  "testedAt": "2026-10-12T09:55:00+08:00",
+  "viewport": { "width": 390, "height": 844, "deviceScaleFactor": 1, "mobile": true },
+  "login": { "ok": true, "account": "demo_leader_0928185730" },
+  "tasks": { "title": "任务与成果 · 小组协作工具箱", "clientWidth": 390, "scrollWidth": 390, "result": "PASS" },
+  "files": { "title": "共享资料库 · 小组协作工具箱", "clientWidth": 390, "scrollWidth": 390, "result": "PASS" },
+  "filePreview": { "buttonClicked": true, "contentVisible": true, "clientWidth": 390, "scrollWidth": 390, "result": "PASS" },
+  "notFound": { "title": "页面不存在 · 小组协作工具箱", "contentVisible": true, "clientWidth": 390, "scrollWidth": 390, "result": "PASS" }
+}

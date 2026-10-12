@@ -32,10 +32,14 @@ export interface TaskView {
   createdBy: string
   dueAt: string | null
   assignees: TaskAssignee[]
+  historicalAssignees: TaskAssignee[]
   latestSubmission: TaskSubmission | null
+  submissions: TaskSubmission[]
   canStart: boolean
   canSubmit: boolean
   canReview: boolean
+  canManage: boolean
+  overdue: boolean
 }
 
 export interface CreateTaskPayload {
@@ -54,6 +58,14 @@ export async function listTasks(groupId: string) {
 export async function createTask(groupId: string, payload: CreateTaskPayload) {
   const response = await http.post<ApiResponse<TaskView>>(`/groups/${groupId}/tasks`, payload)
   return response.data.data
+}
+
+export async function updateTask(taskId: string, payload: CreateTaskPayload) {
+  return (await http.patch<ApiResponse<TaskView>>(`/tasks/${taskId}`, payload)).data.data
+}
+
+export async function cancelTask(taskId: string) {
+  return (await http.post<ApiResponse<TaskView>>(`/tasks/${taskId}/cancel`)).data.data
 }
 
 export async function startTask(taskId: string) {

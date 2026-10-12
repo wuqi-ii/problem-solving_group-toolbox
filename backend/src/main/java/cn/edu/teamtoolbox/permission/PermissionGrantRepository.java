@@ -10,4 +10,5 @@ public interface PermissionGrantRepository extends JpaRepository<PermissionGrant
     List<PermissionGrantEntity> findAllByGroupIdAndUserIdInAndRevokedAtIsNull(String groupId, List<String> userIds);
     Optional<PermissionGrantEntity> findByGroupIdAndUserIdAndPermissionAndRevokedAtIsNull(
             String groupId, String userId, String permission);
+    List<PermissionGrantEntity> findAllByGroupIdAndUserIdAndRevokedAtIsNull(String groupId, String userId);
 }
