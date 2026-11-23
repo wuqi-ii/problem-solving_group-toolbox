@@ -5,6 +5,8 @@ import cn.edu.teamtoolbox.security.CurrentUserPrincipal;
 import cn.edu.teamtoolbox.permission.GrantPermissionRequest;
 import cn.edu.teamtoolbox.permission.PermissionType;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -44,6 +46,16 @@ public class GroupController {
             @AuthenticationPrincipal CurrentUserPrincipal principal
     ) {
         return ApiResponse.ok(groupService.listMembers(groupId, principal.id()));
+    }
+
+    public record GroupNicknameRequest(@Size(max = 30) String nickname) {}
+
+    @PatchMapping("/{groupId}/members/me/nickname")
+    public ApiResponse<Void> updateMyNickname(@PathVariable String groupId,
+            @AuthenticationPrincipal CurrentUserPrincipal principal,
+            @Valid @RequestBody GroupNicknameRequest request) {
+        groupService.updateMyNickname(groupId, principal.id(), request.nickname());
+        return ApiResponse.ok(null);
     }
 
     @PostMapping("/{groupId}/invitations")

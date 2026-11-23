@@ -5,7 +5,7 @@ import { Delete, Key, Plus, Promotion, Setting, UserFilled } from '@element-plus
 
 import {
   cancelInvitation, createGroup, createInvitation, grantPermission, joinGroup, leaveGroup,
-  listGroups, listInvitations, listMembers, removeMember, revokePermission, transferLeadership,
+  listGroups, listInvitations, listMembers, removeMember, revokePermission, transferLeadership, updateMyGroupNickname,
   type GroupView, type InvitationView, type MemberView, type PermissionType,
 } from '@/api/groups'
 import { useSessionStore } from '@/stores/session'
@@ -63,6 +63,20 @@ async function submitGroup() {
   } catch (error: unknown) {
     ElMessage.error(apiErrorMessage(error, '创建失败'))
   } finally { creating.value = false }
+}
+
+async function editMyNickname(groupId: string, member: MemberView) {
+  try {
+    const result = await ElMessageBox.prompt('留空时使用个人昵称。', '修改组内昵称', {
+      inputValue: member.groupNickname ?? '',
+      inputValidator: (value) => (value ?? '').trim().length <= 30 || '组内昵称最多 30 字',
+    })
+    await updateMyGroupNickname(groupId, (result.value ?? '').trim())
+    members.value[groupId] = await listMembers(groupId)
+    ElMessage.success('组内昵称已更新')
+  } catch (error: unknown) {
+    if (!isDialogDismissal(error)) ElMessage.error(apiErrorMessage(error, '更新组内昵称失败'))
+  }
 }
 
 async function handleExpand(opened: string | string[]) {
@@ -207,7 +221,12 @@ const invitationStatus: Record<string, string> = { ACTIVE: '有效', EXPIRED: '�
         </div>
       </template>
       <el-table :data="members[group.id] ?? []" empty-text="正在加载成员">
-        <el-table-column prop="nickname" label="成员" />
+        <el-table-column label="成员">
+          <template #default="{ row }">
+            <router-link :to="{ name: 'member-profile', params: { groupId: group.id, userId: row.userId } }">{{ row.groupNickname || row.nickname }}</router-link>
+            <el-button v-if="row.userId === session.user?.id" text type="primary" @click="editMyNickname(group.id, row)">修改组内昵称</el-button>
+          </template>
+        </el-table-column>
         <el-table-column prop="account" label="账号" />
         <el-table-column label="角色" width="120">
           <template #default="scope">{{ scope.row.role === 'LEADER' ? '组长' : '成员' }}</template>

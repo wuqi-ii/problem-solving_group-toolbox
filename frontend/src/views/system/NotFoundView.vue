@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { getSessionToken } from '@/utils/browserSession'
 
 const router = useRouter()
-const authenticated = computed(() => Boolean(localStorage.getItem('team-toolbox-token')))
+const authenticated = computed(() => Boolean(getSessionToken()))
 </script>
 
 <template>

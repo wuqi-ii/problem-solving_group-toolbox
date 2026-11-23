@@ -92,11 +92,19 @@ public class GroupService {
                 .filter(membership -> users.containsKey(membership.getUserId()))
                 .map(membership -> {
                     UserEntity user = users.get(membership.getUserId());
-                    return new MemberView(user.getId(), user.getAccount(), user.getNickname(),
+                    return new MemberView(user.getId(), user.getAccount(), user.getNickname(), membership.getGroupNickname(),
                             membership.getRole(), membership.getJoinedAt(),
                             permissions.getOrDefault(user.getId(), List.of()));
                 })
                 .toList();
+    }
+
+    @Transactional
+    public void updateMyNickname(String groupId, String userId, String nickname) {
+        requireGroup(groupId);
+        GroupMembershipEntity membership = membershipRepository.findByGroupIdAndUserIdAndStatus(groupId, userId, "ACTIVE")
+                .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "你不是该小组成员"));
+        membership.setGroupNickname(normalizeDescription(nickname));
     }
 
     @Transactional

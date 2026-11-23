@@ -48,6 +48,7 @@ async function submit() {
       <div class="auth-heading">
         <h2>{{ mode === 'login' ? '欢迎回来' : '创建你的账号' }}</h2>
         <p>{{ mode === 'login' ? '登录后继续管理你的小组。' : '账号支持字母、数字和下划线。' }}</p>
+        <p v-if="mode === 'login'" class="muted">每个标签页使用独立会话，可以同时登录不同账号进行协作测试。</p>
       </div>
       <el-form label-position="top" @submit.prevent="submit">
         <el-form-item label="账号">

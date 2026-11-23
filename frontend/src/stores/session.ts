@@ -1,4 +1,12 @@
 import { defineStore } from 'pinia'
+import {
+  clearSessionAuth,
+  getSessionActiveGroup,
+  getSessionToken,
+  getSessionUser,
+  setSessionActiveGroup,
+  setSessionAuth,
+} from '@/utils/browserSession'
 
 export interface CurrentUser {
   id: string
@@ -9,7 +17,7 @@ export interface CurrentUser {
 
 function restoreUser(): CurrentUser | null {
   try {
-    const stored = localStorage.getItem('team-toolbox-user')
+    const stored = getSessionUser()
     return stored ? JSON.parse(stored) as CurrentUser : null
   } catch {
     return null
@@ -17,12 +25,12 @@ function restoreUser(): CurrentUser | null {
 }
 
 function restoreActiveGroupId(): string | null {
-  return localStorage.getItem('team-toolbox-active-group')
+  return getSessionActiveGroup()
 }
 
 export const useSessionStore = defineStore('session', {
   state: () => ({
-    token: localStorage.getItem('team-toolbox-token'),
+    token: getSessionToken(),
     user: restoreUser(),
     activeGroupId: restoreActiveGroupId(),
   }),
@@ -33,21 +41,17 @@ export const useSessionStore = defineStore('session', {
     setAuth(token: string, user: CurrentUser) {
       this.token = token
       this.user = user
-      localStorage.setItem('team-toolbox-token', token)
-      localStorage.setItem('team-toolbox-user', JSON.stringify(user))
+      setSessionAuth(token, JSON.stringify(user))
     },
     clearAuth() {
       this.token = null
       this.user = null
       this.activeGroupId = null
-      localStorage.removeItem('team-toolbox-token')
-      localStorage.removeItem('team-toolbox-user')
-      localStorage.removeItem('team-toolbox-active-group')
+      clearSessionAuth()
     },
     switchGroup(groupId: string | null) {
       this.activeGroupId = groupId
-      if (groupId) localStorage.setItem('team-toolbox-active-group', groupId)
-      else localStorage.removeItem('team-toolbox-active-group')
+      setSessionActiveGroup(groupId)
     },
   },
 })

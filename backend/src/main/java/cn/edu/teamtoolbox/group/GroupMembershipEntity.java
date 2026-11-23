@@ -26,6 +26,9 @@ public class GroupMembershipEntity {
     @Column(nullable = false, length = 20)
     private String role;
 
+    @Column(name = "group_nickname", length = 30)
+    private String groupNickname;
+
     @Column(nullable = false, length = 20)
     private String status;
 
@@ -55,6 +58,8 @@ public class GroupMembershipEntity {
     public String getGroupId() { return groupId; }
     public String getUserId() { return userId; }
     public String getRole() { return role; }
+    public String getGroupNickname() { return groupNickname; }
+    public void setGroupNickname(String groupNickname) { this.groupNickname = groupNickname; }
     public String getStatus() { return status; }
     public Instant getJoinedAt() { return joinedAt; }
     public void promoteToLeader() { this.role = "LEADER"; }

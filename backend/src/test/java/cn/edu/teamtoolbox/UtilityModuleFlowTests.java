@@ -2,6 +2,12 @@ package cn.edu.teamtoolbox;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.zxing.BinaryBitmap;
+import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
+import com.google.zxing.common.HybridBinarizer;
+import com.google.zxing.qrcode.QRCodeReader;
+import javax.imageio.ImageIO;
+import java.io.ByteArrayInputStream;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -37,10 +43,15 @@ class UtilityModuleFlowTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.fileName").value("handoff.txt"))
                 .andExpect(jsonPath("$.data.remainingDownloads").value(2));
-        mockMvc.perform(get("/api/v1/pickup/{code}/qr", code))
+        byte[] qr = mockMvc.perform(get("/api/v1/pickup/{code}/qr", code)
+                        .header("Host", "192.0.2.10:8088"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.IMAGE_PNG))
-                .andExpect(header().exists("Content-Type"));
+                .andReturn().getResponse().getContentAsByteArray();
+        var image = ImageIO.read(new ByteArrayInputStream(qr));
+        var bitmap = new BinaryBitmap(new HybridBinarizer(new BufferedImageLuminanceSource(image)));
+        org.junit.jupiter.api.Assertions.assertEquals("http://192.0.2.10:8088/pickup/" + code,
+                new QRCodeReader().decode(bitmap).getText());
         mockMvc.perform(post("/api/v1/transfer-imports/{code}/device", code)
                         .header("Authorization", authorization)
                         .param("sourceDevice", "临时取件"))

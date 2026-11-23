@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useRoute } from 'vue-router'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ChatDotRound, Check, Delete, Edit, Plus, Upload } from '@element-plus/icons-vue'
@@ -14,6 +15,16 @@ import {
 } from '@/api/tasks'
 
 const groups = ref<GroupView[]>([])
+const route = useRoute()
+const linkedGroupId = computed(() => typeof route.query.group === 'string' ? route.query.group : '')
+const linkedItemId = computed(() => typeof route.query.item === 'string' ? route.query.item : '')
+const linkedGroupUnavailable = computed(() => Boolean(linkedGroupId.value && !groups.value.some(group => group.id === linkedGroupId.value)))
+const focusedId = computed(() => linkedGroupId.value === activeGroupId.value ? linkedItemId.value : '')
+function selectLinkedGroup() {
+  if (linkedGroupId.value && !linkedGroupUnavailable.value) activeGroupId.value = linkedGroupId.value
+}
+watch(linkedGroupId, selectLinkedGroup)
+
 const members = ref<MemberView[]>([])
 const tasks = ref<TaskView[]>([])
 const files = ref<FileView[]>([])
@@ -53,6 +64,7 @@ const activeGroup = computed(() => groups.value.find((group) => group.id === act
 const canCreateTask = computed(() => activeGroup.value?.myRole === 'LEADER'
   || activeGroup.value?.myPermissions.includes('TASK_CREATE'))
 const visibleTasks = computed(() => tasks.value.filter((task) => {
+  if (focusedId.value) return task.id === focusedId.value
   const matchesStatus = !statusFilter.value || task.status === statusFilter.value
   const query = keyword.value.trim().toLowerCase()
   return matchesStatus && (!query || task.title.toLowerCase().includes(query) || task.description?.toLowerCase().includes(query))
@@ -61,6 +73,7 @@ const visibleTasks = computed(() => tasks.value.filter((task) => {
 async function initialize() {
   try {
     groups.value = await listGroups()
+    selectLinkedGroup()
     if (!groups.value.some(group => group.id === activeGroupId.value)) {
       activeGroupId.value = groups.value[0]?.id ?? ''
     } else if (activeGroupId.value) {
@@ -70,13 +83,24 @@ async function initialize() {
   finally { initializing.value = false }
 }
 
+let loadVersion = 0
+
 async function loadGroupData(groupId: string) {
+  if (groupId !== activeGroupId.value) return
+  const version = ++loadVersion
+  loading.value = Boolean(groupId)
   if (!groupId) return
-  loading.value = true
   try {
-    ;[tasks.value, members.value, files.value] = await Promise.all([listTasks(groupId), listMembers(groupId), listFiles(groupId)])
-  } catch { ElMessage.error('任务数据加载失败') }
-  finally { loading.value = false }
+    const result = await Promise.all([listTasks(groupId), listMembers(groupId), listFiles(groupId)])
+    if (version !== loadVersion || groupId !== activeGroupId.value) return
+    tasks.value = result[0]
+    members.value = result[1]
+    files.value = result[2]
+  } catch {
+    if (version === loadVersion && groupId === activeGroupId.value) ElMessage.error('任务数据加载失败')
+  } finally {
+    if (version === loadVersion && groupId === activeGroupId.value) loading.value = false
+  }
 }
 
 async function submitCreate() {
@@ -207,7 +231,13 @@ function downloadAttachment(submission: TaskSubmission) {
   return downloadFile({ id: submission.attachmentFileId, name: submission.attachmentName })
 }
 
-watch(activeGroupId, loadGroupData)
+watch(activeGroupId, groupId => {
+  createVisible.value = submitVisible.value = reviewVisible.value = commentsVisible.value = false
+  tasks.value = []
+  members.value = []
+  files.value = []
+  void loadGroupData(groupId)
+}, { flush: 'sync' })
 onMounted(initialize)
 </script>
 
@@ -219,12 +249,14 @@ onMounted(initialize)
     </div>
   </section>
 
+  <el-alert v-if="!initializing && linkedGroupUnavailable" title="链接对应的小组已无法访问" type="warning" :closable="false" />
+  <router-link v-if="linkedItemId" :to="$route.path">返回完整列表</router-link>
   <el-skeleton v-if="initializing || loading" :rows="5" animated />
   <el-empty v-else-if="groups.length === 0" description="请先创建或加入一个小组" />
-  <el-empty v-else-if="tasks.length === 0" description="该小组还没有任务" />
+  <el-empty v-else-if="tasks.length === 0"  :description="focusedId ? '该任务不存在或已无法访问' : '该小组还没有任务'" />
   <template v-else>
     <div class="task-toolbar"><el-input v-model="keyword" clearable placeholder="搜索任务标题或说明" aria-label="搜索任务标题或说明" /><el-select v-model="statusFilter" clearable placeholder="全部状态" aria-label="任务状态筛选"><el-option v-for="(label, value) in statusText" :key="value" :label="label" :value="value" /></el-select></div>
-    <el-empty v-if="visibleTasks.length === 0" description="没有符合条件的任务" />
+    <el-empty v-if="visibleTasks.length === 0" :description="focusedId ? '该任务不存在或已无法访问' : '没有符合条件的任务'" />
   <section v-else class="task-list">
     <article v-for="task in visibleTasks" :key="task.id" class="task-card">
       <div class="task-card-head">
@@ -243,7 +275,7 @@ onMounted(initialize)
         </div>
       </div>
       <div class="task-meta">
-        <span>执行人：{{ task.assignees.map((item) => item.nickname).join('、') || '暂无当前执行人' }}</span>
+        <span>执行人：<template v-for="(item, index) in task.assignees" :key="item.userId">{{ index ? '、' : '' }}<router-link :to="{ name: 'member-profile', params: { groupId: activeGroupId, userId: item.userId } }">{{ members.find(member => member.userId === item.userId)?.groupNickname || item.nickname }}</router-link></template><template v-if="!task.assignees.length">暂无当前执行人</template></span>
         <span v-if="task.historicalAssignees.length">历史执行人：{{ task.historicalAssignees.map((item) => item.nickname).join('、') }}</span>
         <span>截止：{{ formatTime(task.dueAt) }}</span>
       </div>
@@ -277,7 +309,7 @@ onMounted(initialize)
         <el-form-item label="优先级"><el-select v-model="createForm.priority"><el-option label="低" value="LOW" /><el-option label="普通" value="NORMAL" /><el-option label="高" value="HIGH" /><el-option label="紧急" value="URGENT" /></el-select></el-form-item>
         <el-form-item label="截止时间"><el-date-picker v-model="createForm.dueAt" type="datetime" placeholder="可选" /></el-form-item>
       </div>
-      <el-form-item label="执行人"><el-select v-model="createForm.assigneeIds" multiple placeholder="可选择多人"><el-option v-for="member in members" :key="member.userId" :label="member.nickname" :value="member.userId" /></el-select><div class="form-help">多人任务采用共同完成模式：任一执行人提交成果后，整个任务进入审核。</div></el-form-item>
+      <el-form-item label="执行人"><el-select v-model="createForm.assigneeIds" multiple placeholder="可选择多人"><el-option v-for="member in members" :key="member.userId" :label="member.groupNickname || member.nickname" :value="member.userId" /></el-select><div class="form-help">多人任务采用共同完成模式：任一执行人提交成果后，整个任务进入审核。</div></el-form-item>
     </el-form>
     <template #footer><el-button @click="createVisible = false">关闭</el-button><el-button type="primary" :loading="submitting" @click="submitCreate">{{ editingTask ? '保存修改' : '发布' }}</el-button></template>
   </el-dialog>
@@ -298,7 +330,7 @@ onMounted(initialize)
     <el-empty v-if="comments.length === 0" description="还没有任务留言" />
     <div v-else class="task-comment-list">
       <article v-for="comment in comments" :key="comment.id">
-        <header><strong>{{ comment.authorName }}</strong><span>{{ formatTime(comment.createdAt) }}</span></header>
+        <header><router-link :to="{ name: 'member-profile', params: { groupId: comment.groupId, userId: comment.createdBy } }">{{ members.find(member => member.userId === comment.createdBy)?.groupNickname || comment.authorName }}</router-link><span>{{ formatTime(comment.createdAt) }}</span></header>
         <p>{{ comment.content }}</p>
         <el-button v-if="comment.canDelete" text type="danger" @click="removeComment(comment)">删除</el-button>
       </article>

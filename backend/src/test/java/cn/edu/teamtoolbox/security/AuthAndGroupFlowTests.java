@@ -92,6 +92,19 @@ class AuthAndGroupFlowTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.myRole").value("MEMBER"));
 
+        mockMvc.perform(patch("/api/v1/groups/{groupId}/members/me/nickname", groupId)
+                        .header("Authorization", memberAuthorization)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"  资料负责人  \"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/groups/{groupId}/members", groupId)
+                        .header("Authorization", authorization))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.account == 'member_one')].groupNickname").value("资料负责人"));
+        mockMvc.perform(get("/api/v1/users/me").header("Authorization", memberAuthorization))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.nickname").value("普通成员"));
+
         MockMultipartFile upload = new MockMultipartFile(
                 "file", "prototype-notes.txt", MediaType.TEXT_PLAIN_VALUE, "prototype v1".getBytes());
         String fileBody = mockMvc.perform(multipart("/api/v1/groups/{groupId}/files", groupId)

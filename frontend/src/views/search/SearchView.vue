@@ -10,7 +10,7 @@ import { listFiles } from '@/api/files'
 import { listAnnouncements, listDiscussions } from '@/api/collaboration'
 import { useSessionStore } from '@/stores/session'
 
-interface SearchItem { id: string; type: '任务' | '文件' | '讨论' | '公告'; title: string; detail: string; groupId: string; path: string }
+interface SearchItem { id: string; type: '任务' | '文件' | '讨论' | '公告'; title: string; detail: string; content?: string; tab?: string; groupId: string; path: string }
 const router = useRouter()
 const session = useSessionStore()
 const groups = ref<GroupView[]>([])
@@ -21,7 +21,7 @@ const loading = ref(false)
 const results = computed(() => {
   const query = keyword.value.trim().toLowerCase()
   return items.value.filter(item => (!typeFilter.value || item.type === typeFilter.value)
-    && (!query || `${item.title} ${item.detail}`.toLowerCase().includes(query)))
+    && (!query || `${item.title} ${item.detail} ${item.content ?? ''}`.toLowerCase().includes(query)))
 })
 function groupName(id: string) { return groups.value.find(group => group.id === id)?.name ?? '未知小组' }
 
@@ -36,8 +36,8 @@ onMounted(async () => {
       return [
         ...tasks.map(task => ({ id: task.id, type: '任务' as const, title: task.title, detail: task.description ?? '', groupId: group.id, path: '/tasks' })),
         ...files.map(file => ({ id: file.id, type: '文件' as const, title: file.name, detail: `v${file.versionNo}`, groupId: group.id, path: '/files' })),
-        ...discussions.map(post => ({ id: post.id, type: '讨论' as const, title: post.content.slice(0, 60), detail: post.authorName, groupId: group.id, path: '/collaboration' })),
-        ...announcements.map(post => ({ id: post.id, type: '公告' as const, title: post.content.slice(0, 60), detail: post.authorName, groupId: group.id, path: '/collaboration' })),
+        ...discussions.map(post => ({ id: post.id, type: '讨论' as const, tab: 'discussion', content: post.content, title: post.content.slice(0, 60), detail: post.authorName, groupId: group.id, path: '/collaboration' })),
+        ...announcements.map(post => ({ id: post.id, type: '公告' as const, tab: 'announcement', content: post.content, title: post.content.slice(0, 60), detail: post.authorName, groupId: group.id, path: '/collaboration' })),
       ]
     }))
     items.value = bundles.flat()
@@ -47,7 +47,7 @@ onMounted(async () => {
 
 async function open(item: SearchItem) {
   session.switchGroup(item.groupId)
-  await router.push(item.path)
+  await router.push({ path: item.path, query: { group: item.groupId, item: item.id, tab: item.tab } })
 }
 </script>
 

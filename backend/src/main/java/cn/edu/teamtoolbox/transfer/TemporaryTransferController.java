@@ -3,6 +3,7 @@ package cn.edu.teamtoolbox.transfer;
 import cn.edu.teamtoolbox.common.api.ApiResponse;
 import cn.edu.teamtoolbox.security.CurrentUserPrincipal;
 import cn.edu.teamtoolbox.device.DeviceItemView;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -64,9 +65,12 @@ public class TemporaryTransferController {
     }
 
     @GetMapping(value = "/pickup/{code}/qr", produces = MediaType.IMAGE_PNG_VALUE)
-    public ResponseEntity<byte[]> qrCode(@PathVariable String code) throws Exception {
+    public ResponseEntity<byte[]> qrCode(@PathVariable String code, HttpServletRequest request) throws Exception {
         service.inspect(code);
-        var matrix = new QRCodeWriter().encode(publicBaseUrl + "/pickup/" + code,
+        String host = request.getHeader("Host");
+        String scheme = "https".equals(request.getHeader("X-Forwarded-Proto")) ? "https" : request.getScheme();
+        String origin = host == null ? publicBaseUrl : scheme + "://" + host;
+        var matrix = new QRCodeWriter().encode(origin + "/pickup/" + code,
                 BarcodeFormat.QR_CODE, 280, 280);
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         MatrixToImageWriter.writeToStream(matrix, "PNG", output);

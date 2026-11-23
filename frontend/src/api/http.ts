@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { clearSessionAuth, getSessionToken } from '@/utils/browserSession'
 
 export interface ApiResponse<T> {
   success: boolean
@@ -15,7 +16,7 @@ export const http = axios.create({
 })
 
 http.interceptors.request.use((config) => {
-  const token = localStorage.getItem('team-toolbox-token')
+  const token = getSessionToken()
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
@@ -24,8 +25,7 @@ http.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('team-toolbox-token')
-      localStorage.removeItem('team-toolbox-user')
+      clearSessionAuth()
       if (!window.location.pathname.startsWith('/login')) window.location.assign('/login')
     }
     return Promise.reject(error)

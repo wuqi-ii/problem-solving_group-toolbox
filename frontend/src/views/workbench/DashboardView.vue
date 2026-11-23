@@ -92,7 +92,7 @@ onMounted(async () => {
     <el-empty v-if="groups.length === 0" description="请先创建或加入小组" />
     <el-empty v-else-if="recentTasks.length === 0" description="当前小组还没有任务" />
     <div v-else class="dashboard-task-list">
-      <button v-for="task in recentTasks" :key="task.id" @click="router.push('/tasks')">
+      <button v-for="task in recentTasks" :key="task.id" @click="router.push({ path: '/tasks', query: { group: task.groupId, item: task.id } })">
         <div><strong>{{ task.title }}</strong><span>{{ groupName(task.groupId) }} · {{ task.assignees.map(item => item.nickname).join('、') || '未指派' }}</span></div>
         <el-tag :type="task.overdue ? 'danger' : 'info'">{{ task.overdue ? '已逾期' : statusText[task.status] }}</el-tag>
       </button>

@@ -73,7 +73,7 @@ public class TaskService {
                 .map(userId -> new TaskAssignmentEntity(task.getId(), userId)).toList());
         assigneeIds.stream().filter(userId -> !userId.equals(requesterId)).forEach(userId ->
                 notificationService.create(userId, "task-assigned:" + task.getId(), "TASK_ASSIGNED",
-                        "你有一个新任务", task.getTitle(), "/tasks"));
+                        "你有一个新任务", task.getTitle(), "/tasks?group=" + task.getGroupId() + "&item=" + task.getId()));
         return toView(task, requesterId);
     }
 
@@ -107,7 +107,7 @@ public class TaskService {
             if (assignment == null) {
                 assignmentRepository.save(new TaskAssignmentEntity(taskId, userId));
                 notificationService.create(userId, "task-assigned:" + taskId, "TASK_ASSIGNED",
-                        "你有一个新任务", task.getTitle(), "/tasks");
+                        "你有一个新任务", task.getTitle(), "/tasks?group=" + task.getGroupId() + "&item=" + task.getId());
             } else if (!"ACTIVE".equals(assignment.getStatus())) {
                 assignment.activate();
             }
@@ -118,7 +118,7 @@ public class TaskService {
                 .filter(item -> !item.getUserId().equals(requesterId))
                 .forEach(item -> notificationService.create(
                         item.getUserId(), updateEvent, "TASK_UPDATED",
-                        "任务内容已更新", task.getTitle(), "/tasks"));
+                        "任务内容已更新", task.getTitle(), "/tasks?group=" + task.getGroupId() + "&item=" + task.getId()));
         return toView(task, requesterId);
     }
 
@@ -133,7 +133,7 @@ public class TaskService {
         task.setStatus(TaskStatus.CANCELLED);
         assignments.forEach(assignment -> {
             notificationService.create(assignment.getUserId(), "task-cancelled:" + taskId,
-                    "TASK_CANCELLED", "任务已取消", task.getTitle(), "/tasks");
+                    "TASK_CANCELLED", "任务已取消", task.getTitle(), "/tasks?group=" + task.getGroupId() + "&item=" + task.getId());
         });
         return toView(task, requesterId);
     }
@@ -194,7 +194,7 @@ public class TaskService {
                 ? TaskStatus.COMPLETED : TaskStatus.NEEDS_CHANGES);
         String result = request.decision() == ReviewDecision.APPROVED ? "已通过" : "需要修改";
         notificationService.create(submission.getSubmittedBy(), "task-reviewed:" + submission.getId(),
-                "TASK_REVIEWED", "任务审核结果：" + result, task.getTitle(), "/tasks");
+                "TASK_REVIEWED", "任务审核结果：" + result, task.getTitle(), "/tasks?group=" + task.getGroupId() + "&item=" + task.getId());
         return toView(task, requesterId);
     }
 

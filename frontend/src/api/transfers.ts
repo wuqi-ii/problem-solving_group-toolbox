@@ -21,12 +21,9 @@ export async function createTransfer(file: File, validHours: number, maxDownload
 }
 export async function listTransfers() { return (await http.get<ApiResponse<TransferView[]>>('/transfers')).data.data }
 export async function cancelTransfer(id: string) { await http.delete(`/transfers/${id}`) }
-export async function inspectPickup(code: string) { return (await http.get<ApiResponse<PickupView>>(`/pickup/${code}`)).data.data }
+export async function inspectPickup(code: string) { return (await http.get<ApiResponse<PickupView>>(`/pickup/${encodeURIComponent(code)}`)).data.data }
 export async function downloadPickup(code: string, fileName: string) {
-  const response = await http.get<Blob>(`/pickup/${code}/download`, { responseType: 'blob' })
+  const response = await http.get<Blob>(`/pickup/${encodeURIComponent(code)}/download`, { responseType: 'blob' })
   const url = URL.createObjectURL(response.data); const anchor = document.createElement('a')
   anchor.href = url; anchor.download = fileName; anchor.click(); URL.revokeObjectURL(url)
-}
-export async function savePickupToDevice(code: string) {
-  return (await http.post(`/transfer-imports/${code}/device`, null, { params: { sourceDevice: '临时取件' } })).data.data
 }

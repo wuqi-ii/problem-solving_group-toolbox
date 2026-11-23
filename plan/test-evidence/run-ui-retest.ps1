@@ -98,9 +98,9 @@ try {
   });
   const payload = await response.json();
   if (!response.ok || !payload.data) return {ok: false, status: response.status, payload};
-  localStorage.setItem('team-toolbox-token', payload.data.accessToken);
-  localStorage.setItem('team-toolbox-user', JSON.stringify(payload.data.user));
-  localStorage.setItem('team-toolbox-active-group', '5c064d38-8f1b-4760-96d4-49fe5b2e4e6e');
+  sessionStorage.setItem('team-toolbox-token', payload.data.accessToken);
+  sessionStorage.setItem('team-toolbox-user', JSON.stringify(payload.data.user));
+  sessionStorage.setItem('team-toolbox-active-group', '5c064d38-8f1b-4760-96d4-49fe5b2e4e6e');
   return {ok: true, account: payload.data.user.account};
 })()
 "@ -AwaitPromise

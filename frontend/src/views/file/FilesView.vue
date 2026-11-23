@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useRoute } from 'vue-router'
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete, Download, Edit, Refresh, Upload, View } from '@element-plus/icons-vue'
@@ -12,6 +13,16 @@ import { useSessionStore } from '@/stores/session'
 import { apiErrorMessage, isDialogDismissal } from '@/api/errors'
 
 const groups = ref<GroupView[]>([])
+const route = useRoute()
+const linkedGroupId = computed(() => typeof route.query.group === 'string' ? route.query.group : '')
+const linkedItemId = computed(() => typeof route.query.item === 'string' ? route.query.item : '')
+const linkedGroupUnavailable = computed(() => Boolean(linkedGroupId.value && !groups.value.some(group => group.id === linkedGroupId.value)))
+const focusedId = computed(() => linkedGroupId.value === activeGroupId.value ? linkedItemId.value : '')
+function selectLinkedGroup() {
+  if (linkedGroupId.value && !linkedGroupUnavailable.value) activeGroupId.value = linkedGroupId.value
+}
+watch(linkedGroupId, selectLinkedGroup)
+
 const files = ref<FileView[]>([])
 const session = useSessionStore()
 const activeGroupId = computed({
@@ -36,6 +47,7 @@ const previewText = ref('')
 const previewKind = ref<'text' | 'image' | 'pdf' | 'other'>('other')
 
 const filteredFiles = computed(() => {
+  if (focusedId.value) return files.value.filter(file => file.id === focusedId.value)
   const query = keyword.value.trim().toLowerCase()
   return files.value.filter(file => (!categoryFilter.value || file.category === categoryFilter.value)
     && (!query || file.name.toLowerCase().includes(query)))
@@ -46,6 +58,7 @@ const categoryText: Record<FileCategory, string> = { GENERAL: '通用', DOCUMENT
 async function initialize() {
   try {
     groups.value = await listGroups()
+    selectLinkedGroup()
     if (!groups.value.some(group => group.id === activeGroupId.value)) {
       activeGroupId.value = groups.value[0]?.id ?? ''
     } else if (activeGroupId.value) {
@@ -55,12 +68,23 @@ async function initialize() {
   finally { initializing.value = false }
 }
 
+let loadVersion = 0
+
 async function refresh(groupId = activeGroupId.value) {
+  if (groupId !== activeGroupId.value) return
+  const version = ++loadVersion
+  loading.value = Boolean(groupId)
   if (!groupId) return
-  loading.value = true
-  try { ;[files.value, quota.value] = await Promise.all([listFiles(groupId), getFileQuota(groupId)]) }
-  catch { ElMessage.error('文件列表加载失败') }
-  finally { loading.value = false }
+  try {
+    const result = await Promise.all([listFiles(groupId), getFileQuota(groupId)])
+    if (version !== loadVersion || groupId !== activeGroupId.value) return
+    files.value = result[0]
+    quota.value = result[1]
+  } catch {
+    if (version === loadVersion && groupId === activeGroupId.value) ElMessage.error('文件列表加载失败')
+  } finally {
+    if (version === loadVersion && groupId === activeGroupId.value) loading.value = false
+  }
 }
 
 async function downloadResults() {
@@ -117,7 +141,11 @@ function clearPreviewUrl() {
   previewUrl.value = ''
 }
 
+let previewVersion = 0
+
 async function openPreview(file: FileView) {
+  const version = ++previewVersion
+  const current = () => version === previewVersion && previewVisible.value && activeGroupId.value === file.groupId
   clearPreviewUrl()
   previewName.value = file.name
   previewText.value = ''
@@ -128,12 +156,21 @@ async function openPreview(file: FileView) {
   previewLoading.value = true
   try {
     const blob = await previewFile(file)
-    if (previewKind.value === 'text') previewText.value = await blob.text()
-    else if (previewKind.value === 'image' || previewKind.value === 'pdf') previewUrl.value = URL.createObjectURL(blob)
+    if (!current()) return
+    if (previewKind.value === 'text') {
+      const content = await blob.text()
+      if (current()) previewText.value = content
+    } else if (previewKind.value === 'image' || previewKind.value === 'pdf') {
+      previewUrl.value = URL.createObjectURL(blob)
+    }
   } catch (error: unknown) {
-    previewVisible.value = false
-    ElMessage.error(apiErrorMessage(error, '文件预览失败'))
-  } finally { previewLoading.value = false }
+    if (current()) {
+      previewVisible.value = false
+      ElMessage.error(apiErrorMessage(error, '文件预览失败'))
+    }
+  } finally {
+    if (version === previewVersion) previewLoading.value = false
+  }
 }
 
 function closePreview() {
@@ -143,8 +180,15 @@ function closePreview() {
 
 async function openTrash() {
   if (!activeGroupId.value) return
-  try { trash.value = await listTrash(activeGroupId.value); trashVisible.value = true }
-  catch { ElMessage.error('回收站加载失败') }
+  const groupId = activeGroupId.value
+  try {
+    const result = await listTrash(groupId)
+    if (groupId !== activeGroupId.value) return
+    trash.value = result
+    trashVisible.value = true
+  } catch {
+    if (groupId === activeGroupId.value) ElMessage.error('回收站加载失败')
+  }
 }
 
 async function restore(item: FileView) {
@@ -163,7 +207,14 @@ function formatSize(bytes: number) {
   return `${(bytes / 1024 ** 2).toFixed(1)} MB`
 }
 
-watch(activeGroupId, refresh)
+watch(activeGroupId, groupId => {
+  trashVisible.value = previewVisible.value = false
+  previewVersion++
+  closePreview()
+  files.value = []
+  quota.value = null
+  void refresh(groupId)
+}, { flush: 'sync' })
 onMounted(initialize)
 </script>
 
@@ -178,18 +229,22 @@ onMounted(initialize)
     </div>
   </section>
 
+  <el-alert v-if="!initializing && linkedGroupUnavailable" title="链接对应的小组已无法访问" type="warning" :closable="false" />
+  <router-link v-if="linkedItemId" :to="$route.path">返回完整列表</router-link>
   <el-progress v-if="uploading" :percentage="uploadProgress" class="upload-progress" />
   <div v-if="!initializing && activeGroupId" class="file-quota"><span>资料库容量 {{ formatSize(quota?.usedBytes ?? 0) }} / {{ formatSize(quota?.limitBytes ?? 0) }}</span><el-progress :percentage="quotaPercent" :stroke-width="8" /></div>
   <div v-if="!initializing && activeGroupId" class="library-toolbar"><el-select v-model="categoryFilter" clearable placeholder="全部分类" aria-label="文件分类筛选"><el-option v-for="(label, value) in categoryText" :key="value" :label="label" :value="value" /></el-select><el-input v-model="keyword" clearable placeholder="按文件名搜索" aria-label="按文件名搜索" /></div>
   <el-skeleton v-if="initializing || loading" :rows="5" animated />
   <el-empty v-else-if="groups.length === 0" description="请先创建或加入小组" />
-  <el-empty v-else-if="filteredFiles.length === 0" description="资料库中还没有文件" />
+  <el-empty v-else-if="filteredFiles.length === 0" :description="focusedId ? '该文件不存在或已无法访问' : '资料库中还没有文件'" />
   <el-table v-else :data="filteredFiles" class="file-table desktop-file-table">
     <el-table-column prop="name" label="文件名" min-width="260" />
     <el-table-column label="版本" width="75"><template #default="scope">v{{ scope.row.versionNo }}</template></el-table-column>
     <el-table-column label="分类" width="135"><template #default="scope"><el-select v-if="scope.row.canManage" :model-value="scope.row.category" size="small" @change="changeCategory(scope.row, $event)"><el-option v-for="(label, value) in categoryText" :key="value" :label="label" :value="value" /></el-select><span v-else>{{ categoryText[scope.row.category as FileCategory] }}</span></template></el-table-column>
     <el-table-column label="大小" width="110"><template #default="scope">{{ formatSize(scope.row.sizeBytes) }}</template></el-table-column>
-    <el-table-column prop="uploaderName" label="上传者" width="130" />
+    <el-table-column label="上传者" width="130">
+      <template #default="{ row }"><router-link :to="{ name: 'member-profile', params: { groupId: row.groupId, userId: row.uploadedBy } }">{{ row.uploaderName }}</router-link></template>
+    </el-table-column>
     <el-table-column label="上传时间" width="190"><template #default="scope">{{ new Date(scope.row.createdAt).toLocaleString('zh-CN', { hour12: false }) }}</template></el-table-column>
     <el-table-column label="操作" width="300" fixed="right">
       <template #default="scope">
@@ -204,7 +259,7 @@ onMounted(initialize)
   <section v-if="!initializing && !loading && filteredFiles.length" class="mobile-file-list">
     <article v-for="file in filteredFiles" :key="file.id" class="mobile-file-card">
       <div class="mobile-file-title"><strong>{{ file.name }}</strong><el-tag size="small" effect="plain">v{{ file.versionNo }}</el-tag></div>
-      <dl><div><dt>分类</dt><dd>{{ categoryText[file.category] }}</dd></div><div><dt>大小</dt><dd>{{ formatSize(file.sizeBytes) }}</dd></div><div><dt>上传者</dt><dd>{{ file.uploaderName }}</dd></div><div><dt>上传时间</dt><dd>{{ new Date(file.createdAt).toLocaleString('zh-CN', { hour12: false }) }}</dd></div></dl>
+      <dl><div><dt>分类</dt><dd>{{ categoryText[file.category] }}</dd></div><div><dt>大小</dt><dd>{{ formatSize(file.sizeBytes) }}</dd></div><div><dt>上传者</dt><dd><router-link :to="{ name: 'member-profile', params: { groupId: file.groupId, userId: file.uploadedBy } }">{{ file.uploaderName }}</router-link></dd></div><div><dt>上传时间</dt><dd>{{ new Date(file.createdAt).toLocaleString('zh-CN', { hour12: false }) }}</dd></div></dl>
       <div class="mobile-file-actions"><el-button v-if="file.previewable" :icon="View" @click="openPreview(file)">预览</el-button><el-button type="primary" plain :icon="Download" @click="downloadFile(file)">下载</el-button><el-button v-if="file.canManage" :icon="Edit" @click="editName(file)">改名</el-button><el-button v-if="file.canManage" type="danger" plain :icon="Delete" @click="remove(file)">删除</el-button></div>
     </article>
   </section>

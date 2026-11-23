@@ -49,6 +49,6 @@ public class TaskReminderService {
                 .forEach(assignment ->
                 notificationService.create(
                         assignment.getUserId(), "task-" + eventType + ":" + task.getId() + ":" + dueVersion,
-                        type, title, task.getTitle(), "/tasks"));
+                        type, title, task.getTitle(), "/tasks?group=" + task.getGroupId() + "&item=" + task.getId()));
     }
 }

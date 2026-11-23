@@ -13,6 +13,7 @@ export interface MemberView {
   userId: string
   account: string
   nickname: string
+  groupNickname: string | null
   role: string
   joinedAt: string
   permissions: string[]
@@ -82,4 +83,8 @@ export async function leaveGroup(groupId: string) {
 
 export async function transferLeadership(groupId: string, userId: string) {
   await http.post(`/groups/${groupId}/leader/${userId}`)
+}
+
+export async function updateMyGroupNickname(groupId: string, nickname: string) {
+  await http.patch(`/groups/${groupId}/members/me/nickname`, { nickname })
 }

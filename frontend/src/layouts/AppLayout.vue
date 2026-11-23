@@ -5,7 +5,6 @@ import {
   Collection,
   DataBoard,
   FolderOpened,
-  Monitor,
   Promotion,
   MagicStick,
   Menu as MenuIcon,
@@ -67,6 +66,7 @@ async function signOut() {
           <span>Team Toolbox</span>
         </div>
       </div>
+      <p v-if="session.user" class="mobile-account">{{ session.user.nickname }}（{{ session.user.account }}）</p>
 
       <el-menu :default-active="route.path" router class="nav-menu">
         <el-menu-item index="/">
@@ -83,9 +83,6 @@ async function signOut() {
         </el-menu-item>
         <el-menu-item index="/transfer">
           <el-icon><Promotion /></el-icon><span>临时文件中转</span>
-        </el-menu-item>
-        <el-menu-item index="/devices">
-          <el-icon><Monitor /></el-icon><span>我的设备</span>
         </el-menu-item>
         <el-menu-item index="/notifications">
           <el-icon><Bell /></el-icon><span>通知中心 <el-badge v-if="unread" :value="unread" :max="99" /></span>
@@ -114,7 +111,7 @@ async function signOut() {
           <el-select v-model="activeGroupId" class="topbar-group-select" placeholder="暂无小组" :disabled="groups.length === 0">
             <el-option v-for="group in groups" :key="group.id" :label="group.name" :value="group.id" />
           </el-select>
-          <span>{{ session.user?.nickname }}</span>
+          <span v-if="session.user" :title="session.user.account">{{ session.user.nickname }}（{{ session.user.account }}）</span>
           <el-button text @click="signOut">退出</el-button>
         </div>
       </el-header>
@@ -133,7 +130,6 @@ async function signOut() {
         <el-menu-item index="/search"><el-icon><Search /></el-icon><span>统一搜索</span></el-menu-item>
         <el-menu-item index="/files"><el-icon><FolderOpened /></el-icon><span>共享资料库</span></el-menu-item>
         <el-menu-item index="/transfer"><el-icon><Promotion /></el-icon><span>临时文件中转</span></el-menu-item>
-        <el-menu-item index="/devices"><el-icon><Monitor /></el-icon><span>我的设备</span></el-menu-item>
         <el-menu-item index="/notifications"><el-icon><Bell /></el-icon><span>通知中心</span></el-menu-item>
         <el-menu-item index="/audit"><el-icon><DocumentChecked /></el-icon><span>操作记录</span></el-menu-item>
         <el-menu-item index="/agent"><el-icon><MagicStick /></el-icon><span>AI 协作助手</span></el-menu-item>

@@ -146,7 +146,7 @@ public class CollaborationService {
                 .filter(userId -> !userId.equals(post.getCreatedBy()))
                 .forEach(userId -> notificationService.create(
                         userId, "announcement:" + post.getId(), "GROUP_ANNOUNCEMENT",
-                        "小组发布了新公告", summarize(post.getContent()), "/collaboration"));
+                        "小组发布了新公告", summarize(post.getContent()), "/collaboration?group=" + post.getGroupId() + "&item=" + post.getId() + "&tab=announcement"));
     }
 
     private void notifyTaskComment(TaskEntity task, CollaborationPostEntity post) {
@@ -160,7 +160,7 @@ public class CollaborationService {
                         task.getGroupId(), userId, "ACTIVE").isPresent())
                 .forEach(userId -> notificationService.create(
                 userId, "task-comment:" + post.getId(), "TASK_COMMENT",
-                "任务有新留言：" + task.getTitle(), summarize(post.getContent()), "/tasks"));
+                "任务有新留言：" + task.getTitle(), summarize(post.getContent()), "/tasks?group=" + task.getGroupId() + "&item=" + task.getId()));
     }
 
     private String summarize(String content) {

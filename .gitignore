@@ -1,9 +1,14 @@
 # Codex/Word generation and rendering intermediates
 _doc_work/
 需求分析_word/_analysis_work/
+.ppt-review/
+.ppt_rework/
+系统概要说明/_design_work/
 
 # Third-party reference submissions are kept locally only
 需求分析_word/往届同学需求分析例子2023/
+系统概要说明/往届同学概要设计例子/
+系统概要说明/系统概要设计说明书（模板）.doc
 
 # Local development configuration and runtime data
 .env
